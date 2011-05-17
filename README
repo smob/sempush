@@ -1,1 +1,21 @@
 SemWeb extension for PubSubHubbub
+##################################
+The semhub implementation is similar to that of the pubsubhubbub hub. The following details will provide the information
+of the changes made to the pubsubhubbub hub
+
+-----Requirements
+1. RDF Store or a sparql endpoint. 
+2. This endpoint needs to have access to read and write a graph to store the information 
+   of the subscribers and the publishers.
+
+Note: At this point of time the sparql endpoint in the code is a localhost virtuoso. The graph name and the endpoint is static.
+
+-----Code/Libraries Added
+1. Folder SPARQLWrapper :SparqlWrapper which is a sparql endpoint interface to python. http://sparql-wrapper.sourceforge.net/
+2. Files sparql_connect.py : Code to select and insert triples to an RDF Store via SPARQL Wrapper. This has to be modified according to the requirements for    the hub (Ex: SPARQL Endpoint, graph name has to be accessed through a properties file). 
+
+-----Files Changed
+1. hub.py
+2. feed_diff.py
+
+Note: The code is commented with the differeces and the addtion of new code. Search for 'SMOB' in the code and u can find the changes.
