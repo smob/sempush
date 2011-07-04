@@ -99,7 +99,11 @@ import urllib
 import urlparse
 import wsgiref.handlers
 import xml.sax
+#SMOB: Start import libraries
 import sparql_connect
+from BeautifulSoup import BeautifulStoneSoup
+from sets import Set
+#SMOB: End
 
 from google.appengine import runtime
 from google.appengine.api import datastore_types
@@ -128,7 +132,7 @@ async_proxy = async_apiproxy.AsyncAPIProxy()
 ################################################################################
 # Config parameters
 
-DEBUG = True
+DEBUG = False
 
 if DEBUG:
   logging.getLogger().setLevel(logging.DEBUG)
@@ -1572,28 +1576,38 @@ class EventToDeliver(db.Expando):
               we might have to refer the FOAF profiles using the callback URL. Once we get all the
               call back urls we compare it with all_subscribers subscription objects to get the 
               relevant one '''
-    
+      
+      #VIDEO: SMOB Video 
+      logging.info('-------Total Number of subscribers: %r', len(all_subscribers))
+      for subscriber in all_subscribers:
+        logging.info('--Subscriber: %r', subscriber.callback)
+        logging.info('--------------')
       #SMOB: Start code to execute the SPARQL Queries and get the call back URLs
-      #variable to hold the call back URIs resulting from the sparql query 
-      callback_uris = []
+      #A set to hold the call back URIs. Possibily of two call_back URIs received
+      #by two SPARQL queries
+      callback_uris = Set()
       #variable to hold the matched subscribers
       revised_subscribers = []
       for restriction in self.access_restrictions:
-        logging.debug('Restriction: %r', restriction)
+        restriction = unicode(BeautifulStoneSoup(restriction, convertEntities=BeautifulStoneSoup.ALL_ENTITIES))
         #The object can be instantiated only once to connect and multiple inserts can be done
         #SMOB: This is the place to change code for getting the sparql queries
         connect=sparql_connect.VirtuosoConnect()
-        callback_uris = connect.select(restriction)
+        logging.info('Access Space: %r', restriction)
+        callback_uris.update(set(connect.select(restriction)))
         logging.debug('Callbacks from SPARQL: %r', callback_uris)
       
       for subscriber in all_subscribers:
         for sparql_callback in callback_uris:
-          logging.info('sparql callback: %r', sparql_callback)
-          logging.info('subscriber callback: %r', subscriber.callback)
           if str(subscriber.callback)==str(sparql_callback):
               revised_subscribers.append(subscriber)
+              
       all_subscribers=revised_subscribers
-      logging.info('Number of subscribers: %r', len(all_subscribers))
+      #VIDEO: SMOB Video 
+      logging.info('-------Total Number of subscribers with access: %r', len(all_subscribers))
+      for subscriber in all_subscribers:
+        logging.info('--Subscriber: %r', subscriber.callback)
+        logging.info('--------------')
       #SMOB: End code
         
       more_subscribers = len(all_subscribers) > chunk_size
@@ -2409,6 +2423,7 @@ def find_feed_updates(topic, format, feed_content,
   '''header_footer, entries_map = filter_feed(feed_content, format)'''
   #SMOB: Start code
   header_footer, entries_map, restrictions_map = filter_feed(feed_content, format)
+  restriction_keys = restrictions_map.keys()
   #SMOB: End code
   # Find the new entries we've never seen before, and any entries that we
   # knew about that have been updated.
@@ -2447,7 +2462,7 @@ def find_feed_updates(topic, format, feed_content,
     logging.debug('content: %r', new_content)
     entry_payloads.append(new_content)
     #SMOB: Start code to get the updated entry restrictions
-    entry_restrictions.append(restrictions_map[entry_id])
+    entry_restrictions.extend(restrictions_map[entry_id])
     #SMOB: End code
     entities_to_save.append(FeedEntryRecord.create_entry_for_topic(
         topic, entry_id, new_content_hash))
@@ -2527,21 +2542,6 @@ def inform_event(event_to_deliver, alternate_topics):
   """
   pass
 
-#SMOB: Start code to extract the queries from the content 
-def extract_restrictions(feed_content, format):
-  """Extracts the sparql queries for each of the entry_id and pushes it into the MAP.
-
-  
-  Args:
-    feed_content:  Content of the feed from which the queries are extracted
-    format: format of the content rss/atom
-  Returns: The queries in the content is extracted and the returned without the queries  
-  """
-  content = feed_content.replace('pavan', '')
-  return content
-  
-#SMOB: End code
-
 def parse_feed(feed_record,
                headers,
                content,
@@ -2577,9 +2577,6 @@ def parse_feed(feed_record,
     order = (RSS, ATOM, ARBITRARY)
   else:
     order = (ATOM, RSS, ARBITRARY)
-  #SMOB: Start code to extract queries
-  content = extract_restrictions(content, 'atom')
-  #SMOB: End code
         
   parse_failures = 0
   for format in order:
@@ -2590,7 +2587,7 @@ def parse_feed(feed_record,
           feed_record.topic, format, content)'''
       header_footer, entities_to_save, entry_payloads, entry_restrictions = find_feed_updates(
           feed_record.topic, format, content)
-      logging.info('Entry restrictions: %r', entry_restrictions)
+      logging.debug('Entry restrictions: %r', entry_restrictions)
       #SMOB: End code
       break
     except (xml.sax.SAXException, feed_diff.Error), e:

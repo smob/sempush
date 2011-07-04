@@ -24,8 +24,9 @@ import logging
 import xml.sax
 import xml.sax.handler
 import xml.sax.saxutils
-
-
+#SMOB: Start adding another xml library
+import xml.dom.minidom
+import re
 # Set to true to see stack level messages and other debugging information.
 DEBUG = False
 
@@ -147,13 +148,46 @@ def strip_whitespace(enclosing_tag, all_parts):
     stripped = first_part[:channel_part].strip('\n\r\t ')
     return '%s\n</channel>\n</%s>' % (stripped, enclosing_tag)
 
+#SMOB: Start code to extract the queries from the content 
+def remove_accessspace(feed_content, format):
+  """Removes the sparql queries for each of the entry_id and pushes it into the MAP.
+
+  
+  Args:
+    feed_content:  Content of the feed from which the queries are extracted
+    format: format of the content rss/atom
+  Returns: returned content without the queries
+  
+  TODO: Need to check if there is any difference in xml based on the formats  
+  """
+  
+  
+  """ Pavan: I tried using the xml.dom here but returned some parsing error
+      NOW: Works with regular expression string manipulation
+      TODO: Sophisticated way to parse the xml and remove an Element from it
+  dom = xml.dom.minidom.parseString(feed_content)
+  items = dom.getElementsByTagName('slideshow')
+  for item in items:
+    access_spaces = items.getElementsByTagName('access')
+    for access_space in access_spaces:
+        item.removeChild(access_space)
+        
+  return dom.toxml()"""
+  
+  content_array = re.split('<access>.*</access>', feed_content)
+  content = ''
+  for c in content_array:
+    content += c
+  return content
+  
+#SMOB: End code
 
 class AtomFeedHandler(FeedContentHandler):
   """Sax content handler for Atom feeds."""
 
   def handleEvent(self, event, content):
     #SMOB: Logging to see content of each feed
-    logging.debug('content: %r', content)
+    #logging.info('content: %r', content)
     depth, tag = event[0], event[1].lower()
     if depth == 1:
       if tag != 'feed' and not tag.endswith(':feed'):
@@ -161,15 +195,34 @@ class AtomFeedHandler(FeedContentHandler):
       else:
         self.header_footer = strip_whitespace(event[1], self.pop())
     elif depth == 2 and (tag == 'entry' or tag.endswith(':entry')):
-      self.entries_map[self.last_id] = ''.join(self.pop())
-      #SMOB: Start code, adding the SPARQL queries to each entry_id
-      '''SMOB: TODO the restrictions map should be extracted from the content and stored, here it is just 
-                for the protoype. This should again be done for the RssFeedHandler below'''
-      self.entries_restrictions_map[self.last_id] = ''.join("""PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?s FROM <http://localhost:8890/DAV/home/smob> WHERE { ?s ?p ?q }""")
-      #SMOB: End code
+      entry = ''.join(self.pop())  
+      #self.entries_map[self.last_id] = ''.join(self.pop())
+      #SMOB: Start code to remove the access_space
+      self.entries_map[self.last_id] = remove_accessspace(''.join(self.pop()), 'atom')
+      #SMOB: End 
     elif depth == 3 and (tag == 'id' or tag.endswith(':id')):
       self.last_id = ''.join(content).strip()
       self.emit(self.pop())
+    #SMOB: Start code, 
+    #TODO: Replace this below code with that of the RSS Handler
+    #elif depth == 3 and (tag == 'access' or tag.endswith(':access')):
+      #self.entries_restrictions_map[self.last_id] = ''.join("""PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?s FROM <http://localhost:8890/DAV/home/smob> WHERE { ?s ?p ?q }""")
+      #self.emit(self.pop())
+      #SMOB: End code
+    #SMOB: Start code to add the entry restrictions
+    elif (tag == 'space' or tag.endswith(':space')) and (
+        depth == 5 or (depth == 4 and 'rdf' in self.enclosing_tag)):
+      access_queries = []
+      restriction = ''.join(content).strip()
+      item_id = (self.last_id or self.last_link or
+                 self.last_title or self.last_description)
+      for id, queries in self.entries_restrictions_map.iteritems():
+        if(id == item_id):
+            access_queries = queries
+      access_queries.append(restriction);
+      self.entries_restrictions_map[item_id] = access_queries
+      self.emit(self.pop())
+    
     else:
       self.emit(self.pop())
 
@@ -190,9 +243,10 @@ class RssFeedHandler(FeedContentHandler):
         depth == 3 or (depth == 2 and 'rdf' in self.enclosing_tag)):
       item_id = (self.last_id or self.last_link or
                  self.last_title or self.last_description)
-      self.entries_map[item_id] = ''.join(self.pop())
+      #SMOB: Removing the access_space before adding this to the entry payloads
+      self.entries_map[item_id] = remove_accessspace(''.join(self.pop()), 'rss') 
       #SMOB: Start code, adding the SPARQL queries to each entry_id
-      self.entries_restrictions_map[self.last_id] = ''.join('select ?s where {?s ?p ?o}')
+      #self.entries_restrictions_map[item_id] = ''.join('select ?s where {?s ?p ?o}')
       #SMOB: End code
       self.last_id, self.last_link, self.last_title, self.last_description = (
           '', '', '', '')
@@ -212,6 +266,26 @@ class RssFeedHandler(FeedContentHandler):
         depth == 4 or (depth == 3 and 'rdf' in self.enclosing_tag)):
       self.last_description = ''.join(content).strip()
       self.emit(self.pop())
+    #SMOB: Start code to add the entry restrictions
+    elif (tag == 'space' or tag.endswith(':space')) and (
+        depth == 5 or (depth == 4 and 'rdf' in self.enclosing_tag)):
+      restriction = ''.join(content).strip()
+      access_queries = []
+      item_id = (self.last_id or self.last_link or
+                 self.last_title or self.last_description)
+      for id, queries in self.entries_restrictions_map.iteritems():
+        if(id == item_id):
+            access_queries = queries
+      access_queries.append(restriction);
+      self.entries_restrictions_map[item_id] = access_queries
+      self.emit(self.pop())
+    #elif (tag == 'access' or tag.endswith(':access')) and (
+    #    depth == 4 or (depth == 3 and 'rdf' in self.enclosing_tag)):
+    #  restriction = ''.join(content).strip()
+    #  logging.info('Restriction: %r', restriction)
+    #  self.entries_restrictions_map[self.last_link] = ''.join(content).strip()
+    #  self.emit(self.pop())'''
+    #SMOB: End code
     else:
       self.emit(self.pop())
 
