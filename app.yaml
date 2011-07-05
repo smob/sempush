@@ -33,8 +33,8 @@ handlers:
   secure: optional
 
 - url: /rsa
-  static_files: xmppwebid_cert.p12
-  upload: xmppwebid_cert.p12
+  static_files: hub_cert.p12
+  upload: hub_cert.p12
   secure: optional
   
 - url: /remote_api
