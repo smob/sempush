@@ -27,6 +27,16 @@ handlers:
   upload: favicon\.ico
   secure: optional
 
+- url: /me
+  static_files: me.html
+  upload: me\.html
+  secure: optional
+
+- url: /rsa
+  static_files: xmppwebid_cert.p12
+  upload: xmppwebid_cert.p12
+  secure: optional
+  
 - url: /remote_api
   script: $PYTHON_LIB/google/appengine/ext/remote_api/handler.py
   login: admin
