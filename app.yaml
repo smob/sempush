@@ -28,14 +28,14 @@ handlers:
   secure: optional
 
 - url: /me
-  static_files: me.html
-  upload: me\.html
+  static_files: me.rdf
+  upload: me\.rdf
   secure: optional
 
 - url: /rsa
   static_files: hub_cert.p12
   upload: hub_cert.p12
-  secure: optional
+  secure: always
   
 - url: /remote_api
   script: $PYTHON_LIB/google/appengine/ext/remote_api/handler.py
