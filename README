@@ -25,10 +25,9 @@ To support WebID authentication by the subscriber
 
 When subscriber request to subscribe, hub must request for the subscriber private profile.
 It's going to be /private by default, but subscriber should notify the hub about it before in some way.
-When the hub request the subscriber /private, then the subscriber request the hub /me and /rsa (done) and subscriber will answer with the private profile.
+When the hub request the subscriber /private, then the subscriber request the hub certificate (hub_cert.pem) and WebID uri (currently in /me) and the subscriber will answer with the private profile.
 
 
 *Important Notes* (Julia): 
 1. GAE development server doesn't support HTTPS connections!!, other restrictions too (http://code.google.com/appengine/docs/python/config/appconfig.html#Secure_URLs)
-2. The provided certificate (/rsa) and public profile (/me) don't use a valid unique URI, but a localhost one.
-3. The hub client certificate should be served when negotiating HTTPS connection, not in a different URL (/rsa). 
+2. The provided certificate (hub_cert.pem) and public profile (/me) don't use a valid unique URI, but a localhost one.
