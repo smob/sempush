@@ -39,9 +39,7 @@ result = get_private_uri(uri_to_get, cert_path, key_path)
 """
 
 HUB_CERTIFICATE = 'hub_cert.pem'
-HUB_CERTIFICATE = '/home/duy/deri/code/repositories/xmppwebid_cert_key.pem'
 HUB_KEY = 'hub_key.key'
-HUB_KEY = '/home/duy/deri/code/repositories/xmppwebid_key.key'
 subscriber_private_uri = "https://localhost/smob/private"
 
 
